@@ -258,7 +258,7 @@ always_ff @(posedge clk_sys) begin
 				bank_reg <= din;
 			end
 		end else if (bank_type == 3'd1 && (address_in[15:4]) == 12'hFF8) // activision bank
-			bank_reg <= address_in[3:0];
+			bank_reg <= address_in[2:0]; // Note: this will sometimes be set with 4 bits, but should truncate. (Double Dragon)
 		else if (bank_type == 3'd3 && address_in[15]) // Absolute
 			bank_reg <= din[1:0];
 	end
