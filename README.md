@@ -34,6 +34,14 @@ Please note that some games do not use paddle 1A for their input, some exception
 
 To make dealing with this easier, there is an option to swap paddles A and B of either port, so that 1A will become 1B and vice versa. Additionally, if the input type is set to "auto" with 2600 games, pressing the fire button will toggle the input into Joystick mode, and pressing the paddle button will toggle the input into Paddle mode, for convenience.
 
+## Keyboard shortcuts
+- F1 Select
+- F2 Start
+- F3 B/W toggle switch
+- F4 Difficulty Left toggle switch A/B
+- F5 Difficulty Right toggle switch A/B
+- F6 Pause
+
 ## Additional Notes
 Some games use the [difficulty switches](https://atariage.com/forums/topic/235913-atari-7800-difficulty-switches-guide/) to control their behavior, most notably Tower Toppler, which will continue to skip levels if the switches are in the "low" position. Tower Toppler also relies on composite blending artifacts to look correct, so it may be worthwhile to enable that for this game. The 7800 had issues with color consistency depending on the temperature of the system. Not all games may look ideal with the warm palette, so you may have to experiment per game to find the ideal colors.
 
