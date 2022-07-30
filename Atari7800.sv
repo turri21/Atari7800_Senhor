@@ -40,13 +40,14 @@ module emu
 	output        VGA_F1,
 	output [1:0]  VGA_SL,
 	output        VGA_SCALER, // Force VGA scaler
+	output        VGA_DISABLE, // analog out is off
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
 	output        HDMI_FREEZE,
 
 `ifdef MISTER_FB
-	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
+	// Use framebuffer in DDRAM
 	// FB_FORMAT:
 	//    [2:0] : 011=8bpp(palette) 100=16bpp 101=24bpp 110=32bpp
 	//    [3]   : 0=16bits 565 1=16bits 1555
@@ -168,11 +169,12 @@ assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign AUDIO_S   = 0;
 assign AUDIO_MIX = status[3:2];
 
-assign LED_USER  = cart_download | bk_state |  bk_pending;
+assign LED_USER  = cart_download | bk_state | bk_pending;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
 assign VGA_SCALER = 0;
+assign VGA_DISABLE = 0;
 
 assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
@@ -223,7 +225,7 @@ reg old_cart_download;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXX XXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX    XXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX    XXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -275,7 +277,7 @@ parameter CONF_STR = {
 	"P3,Advanced;",
 	"P3OH,Bypass Bios,Yes,No;",
 	"P3O1,Clear Memory,Zero,Random;",
-	"P3O7,Pokey IRQ Enabled,No,Yes;",
+	"P3O8,Pokey IRQ Enabled,No,Yes;",
 	"D2P3OL,CPU Driver,TIA,Maria;",
 	"-;",
 	"o3,Pause Core on OSD,Off,On;",
@@ -302,7 +304,7 @@ parameter CONF_STR = {
 
 
 wire  [1:0] buttons;
-logic [63:0] status, status_in;
+logic [127:0] status, status_in;
 wire         status_set;
 wire        forced_scandoubler;
 wire        img_mounted;
@@ -506,7 +508,7 @@ Atari7800 main
 	.pal_temp     (status[31:30]),
 	.tia_mode     (tia_mode && ~status[17]),
 	.bypass_bios  (~status[17]),
-	.pokey_irq    (status[7]),
+	.pokey_irq    (status[8]),
 	.hsc_en       (~use_sk && (~|status[19:18] && (|cart_save || cart_xm[0]) ? 1'b1 : status[18])),
 	.hsc_ram_dout (hsc_ram_dout),
 	.hsc_ram_cs   (hsc_ram_cs),
@@ -805,7 +807,7 @@ paddle_chooser paddles
 	.analog     ({joya_3, joya_2, joya_1, joya_0}),
 	.paddle     ({pd_3, pd_2, pd_1, pd_0}),
 	.buttons_in ({joy3[9], joy2[9], joy1[9], joy0[9]}),
-	
+
 	.assigned   ({pad3_assigned, pad2_assigned, pad1_assigned, pad0_assigned}),
 	.pd_out     ({pad_ax[3], pad_ax[2], pad_ax[1], pad_ax[0]}),
 	.paddle_but (pad_b)
@@ -964,7 +966,7 @@ always @(posedge clk_sys) begin
 			9'h1a: keya <= ps2_key[9]; // Z
 			9'h22: key0 <= ps2_key[9]; // X
 			9'h21: keyh <= ps2_key[9]; // C
-			
+
 			// Numeric Keypad Layout
 			9'h77: key1 <= ps2_key[9]; // Numlock
 			9'h4A: key2 <= ps2_key[9]; // Divide
@@ -978,7 +980,7 @@ always @(posedge clk_sys) begin
 			9'h69: keya <= ps2_key[9]; // Num 1
 			9'h72: key0 <= ps2_key[9]; // Num 2
 			9'h7A: keyh <= ps2_key[9]; // Num 3
-			
+
 			9'h05: keyselect <= ps2_key[9];  // F1
 			9'h06: keystart  <= ps2_key[9];  // F2
 			9'h04: keybw     <= ps2_key[9];  // F3
@@ -1079,7 +1081,7 @@ always_comb begin
 	robor[2] = ~($signed(joyar_0[7:0]) < -63);
 	robor[1] = ~($signed(joyar_0[15:8]) > 63);
 	robor[0] = ~($signed(joyar_0[15:8]) < -63);
-	
+
 	robol[3] = ~($signed(joya_0[7:0]) > 63);
 	robol[2] = ~($signed(joya_0[7:0]) < -63);
 	robol[1] = ~($signed(joya_0[15:8]) > 63);
