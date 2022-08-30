@@ -29,12 +29,14 @@ module paddle_chooser
 	input   logic   [3:0]           mask,           // Mask of enabled paddles
 	input   logic                   enable0,        // Port 0 Enable
 	input   logic                   enable1,        // Port 1 Enable
-	
+	input   logic                   use_multi,      // Allows the same joystick to assign multiple axis
+
 	input   logic   [24:0]          mouse,          // PS2 Mouse Input
 	input   logic   [3:0][15:0]     analog,         // Analog stick for controller X
 	input   logic   [3:0][7:0]      paddle,         // Spinner input X
 	input   logic   [3:0]           buttons_in,
-	
+	input   logic   [3:0]           alt_b_in,
+
 	output  logic   [3:0]           assigned,       // Momentary input assigned signal
 	output  logic   [3:0][7:0]      pd_out,         // Paddle output data
 	output  logic   [3:0][3:0]      paddle_type,    // Paddle output data type
@@ -44,7 +46,7 @@ module paddle_chooser
 	// Determinations:
 	// Mouse -- Button pressed
 	// Spinner/Analog -- Movement to extremes
-	
+
 	logic [3:0] xs_assigned, ys_assigned, pdi_assigned, paddle_assigned, output_assigned;
 	logic mouse_assigned;
 	logic [1:0] types[4];
@@ -54,12 +56,12 @@ module paddle_chooser
 	logic [3:0][7:0] xs_unsigned;
 	logic [3:0][7:0] ys_unsigned;
 	logic [3:0] xs_select, ys_select, p_select;
-	
+
 	assign xs_unsigned[0] = {~analog[0][7], analog[0][6:0]};
 	assign xs_unsigned[1] = {~analog[1][7], analog[1][6:0]};
 	assign xs_unsigned[2] = {~analog[2][7], analog[2][6:0]};
 	assign xs_unsigned[3] = {~analog[3][7], analog[3][6:0]};
-	
+
 	assign ys_unsigned[0] = {~analog[0][15], analog[0][14:8]};
 	assign ys_unsigned[1] = {~analog[1][15], analog[1][14:8]};
 	assign ys_unsigned[2] = {~analog[2][15], analog[2][14:8]};
@@ -69,25 +71,26 @@ module paddle_chooser
 	paddle_select pdjx1(clk, xs_unsigned[1], xs_select[1]);
 	paddle_select pdjx2(clk, xs_unsigned[2], xs_select[2]);
 	paddle_select pdjx3(clk, xs_unsigned[3], xs_select[3]);
-	
+
 	paddle_select pdjy0(clk, ys_unsigned[0], ys_select[0]);
 	paddle_select pdjy1(clk, ys_unsigned[1], ys_select[1]);
 	paddle_select pdjy2(clk, ys_unsigned[2], ys_select[2]);
 	paddle_select pdjy3(clk, ys_unsigned[3], ys_select[3]);
-	
+
 	paddle_select pdp0(clk, paddle[0], p_select[0]);
 	paddle_select pdp1(clk, paddle[1], p_select[1]);
 	paddle_select pdp2(clk, paddle[2], p_select[2]);
 	paddle_select pdp3(clk, paddle[3], p_select[3]);
-	
+
 	logic [3:0][15:0] old_analog;
 	logic [3:0][7:0] old_paddle;
+	logic [3:0] use_alt_buttons;
 	logic old_stb;
 	reg  signed [8:0] mx = 0;
 	wire signed [8:0] mdx = {mouse[4],mouse[15:8]};
 	wire signed [8:0] mdx2 = (mdx > 64) || (mouse[6] && ~mouse[4]) ? 9'd64 : (mdx < -64) || (mouse[6] && mouse[4]) ? -8'd64 : mdx;
 	wire signed [8:0] nmx = mx + mdx2;
-	
+
 	assign mouse_button = mouse[0];
 
 	always_comb begin
@@ -97,14 +100,14 @@ module paddle_chooser
 			if (output_assigned[x]) begin
 				case (paddle_type[x])
 					0: begin pd_out[x] = ~paddle[index[x]]; paddle_but[x] = buttons_in[index[x]]; end
-					1: begin pd_out[x] = ~(analog_axis[x] ? xs_unsigned[index[x]][7:0] : ys_unsigned[index[x]][7:0]); paddle_but[x] = buttons_in[index[x]]; end
+					1: begin pd_out[x] = ~(analog_axis[x] ? xs_unsigned[index[x]][7:0] : ys_unsigned[index[x]][7:0]); paddle_but[x] = ~use_alt_buttons[x] ? buttons_in[index[x]] : alt_b_in[index[x]]; end
 					2: begin pd_out[x] = ~{~mx[7], mx[6:0]}; paddle_but[x] = mouse_button | ((~xs_assigned[0] & ~ys_assigned[0]) ? buttons_in[0] : 1'b0); end
 					default: ;
 				endcase
 			end
 		end
 	end
-	
+
 	always @(posedge clk) begin
 		reg current_assign;
 		assigned <= '0;
@@ -116,7 +119,7 @@ module paddle_chooser
 						assigned[y] <= 1;
 						xs_assigned[x] <= 1;
 						current_assign = 1;
-						ys_assigned[x] <= 1;
+						ys_assigned[x] <= ~use_multi | ys_assigned[x];
 						output_assigned[y] <= 1;
 						paddle_type[y] <= 1;
 						index[y] <= x[1:0];
@@ -127,9 +130,10 @@ module paddle_chooser
 					if (ys_select[x] && ~ys_assigned[x]) begin
 						assigned[y] <= 1;
 						ys_assigned[x] <= 1;
-						xs_assigned[x] <= 1;
+						xs_assigned[x] <= ~use_multi | xs_assigned[x];
 						current_assign = 1;
 						output_assigned[y] <= 1;
+						use_alt_buttons[y] <= use_multi;
 						paddle_type[y] <= 1;
 						analog_axis[y] <= 0;
 						index[y] <= x[1:0];
@@ -159,7 +163,7 @@ module paddle_chooser
 		if(old_stb != mouse[24]) begin
 			mx <= (nmx < -128) ? -9'd128 : (nmx > 127) ? 9'd127 : nmx;
 		end
-	
+
 		if (reset) begin
 			mouse_assigned <= 0;
 			assigned <= '0;
@@ -168,6 +172,7 @@ module paddle_chooser
 			xs_assigned <= '0;
 			ys_assigned <= '0;
 			output_assigned <= '0;
+			use_alt_buttons <= '0;
 			paddle_type <= '0;
 		end
 	end
@@ -316,7 +321,7 @@ end
 // 	33'h097A37D8C, 33'h097E8A582, 33'h0982DCD78, 33'h09872F56E, 33'h098B81D64, 33'h098FD455A, 33'h099426D50, 33'h099879546,
 // 	33'h099CCBD3C, 33'h09A11E532, 33'h09A570D28, 33'h09A9C351E, 33'h09AE15D14, 33'h09B26850A, 33'h09B6BAD00, 33'h09BB0D4F6,
 // 	33'h09BF5FCEC, 33'h09C3B24E2, 33'h09C804CD8, 33'h09CC574CE, 33'h09D0A9CC4, 33'h09D4FC4BA, 33'h09D94ECB0, 33'h09DDA14A6,
-// 	33'h09E1F3C9C, 33'h09E646492, 33'h09EA98C88, 33'h09EEEB47E, 33'h09F33DC74, 33'h09F79046A, 33'h09FBE2C60, 33'h0A0035456, 
+// 	33'h09E1F3C9C, 33'h09E646492, 33'h09EA98C88, 33'h09EEEB47E, 33'h09F33DC74, 33'h09F79046A, 33'h09FBE2C60, 33'h0A0035456,
 // 	33'h0A0487C4C, 33'h0A08DA442, 33'h0A0D2CC38, 33'h0A117F42E, 33'h0A15D1C24, 33'h0A1A2441A, 33'h0A1E76C10, 33'h0A22C9406,
 // 	33'h0A271BBFC, 33'h0A2B6E3F2, 33'h0A2FC0BE8, 33'h0A34133DE, 33'h0A3865BD4, 33'h0A3CB83CA, 33'h0A410ABC0, 33'h0A455D3B6,
 // 	33'h0A49AFBAC, 33'h0A4E023A2, 33'h0A5254B98, 33'h0A56A738E, 33'h0A5AF9B84, 33'h0A5F4C37A, 33'h0A639EB70, 33'h0A67F1366,

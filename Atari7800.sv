@@ -225,7 +225,7 @@ reg old_cart_download;
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXX    XXXXXXXX
+// XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX XXXXXXXXXXXXXXXXXXXXX   XXXXXXXX
 
 `include "build_id.v"
 parameter CONF_STR = {
@@ -259,6 +259,7 @@ parameter CONF_STR = {
 	"P2o69,Port1 Input,Auto,None,Joystick,Lightgun,Paddle,Trakball,Keypad,Driving,STMouse,AmigaMouse,BoosterGrip,Robotron,SaveKey,SNAC;",
 	"P2oAD,Port2 Input,Auto,None,Joystick,Lightgun,Paddle,Trakball,Keypad,Driving,STMouse,AmigaMouse,BoosterGrip,Robotron,SaveKey,SNAC;",
 	"h1P2O5,SNAC Analog,Yes,No;",
+	"P2oK,Allow Multi Paddles,No,Yes;",
 	"h1P2O6,Sega Phaser Mode,No,Yes;",
 	"P2oH,Swap Paddle A<->B,No,Yes;",
 	"P2oE,Quadtari,Off,On;",
@@ -803,10 +804,12 @@ paddle_chooser paddles
 	.mask       (paddle_mask),
 	.enable0    (1'b1),
 	.enable1    (1'b1),
+	.use_multi  (status[52]),
 	.mouse      (ps2_mouse),
 	.analog     ({joya_3, joya_2, joya_1, joya_0}),
 	.paddle     ({pd_3, pd_2, pd_1, pd_0}),
 	.buttons_in ({joy3[9], joy2[9], joy1[9], joy0[9]}),
+	.alt_b_in   ({joy3[5], joy2[5], joy1[5], joy0[5]}),
 
 	.assigned   ({pad3_assigned, pad2_assigned, pad1_assigned, pad0_assigned}),
 	.pd_out     ({pad_ax[3], pad_ax[2], pad_ax[1], pad_ax[0]}),
