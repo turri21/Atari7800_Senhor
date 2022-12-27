@@ -19,16 +19,14 @@ module lightgun
 
 	input        BTN_MODE,
 	input  [1:0] SIZE,
-	
+
 	input  [7:0] SENSOR_DELAY,
 	input  [7:0] LINE_DELAY,
-	
+
 	output logic TARGET,
 	output logic SENSOR,
 	output logic TRIGGER
 );
-
-//localparam H_WIDTH = 9'd372;
 
 assign TARGET  = ~offscreen & draw;
 
@@ -40,8 +38,6 @@ wire [9:0] new_y = {lg_y[8],lg_y} - {{2{MOUSE[5]}},MOUSE[23:16]};
 
 wire [8:0] j_x = {~JOY_X[7], JOY_X[6:0]};
 wire [8:0] j_y = {~JOY_Y[7], JOY_Y[6:0]};
-logic first_light, first_light_h;
-logic [9:0] first_light_line, first_light_col;
 
 reg offscreen = 0, draw = 0;
 always @(posedge CLK) begin
@@ -55,24 +51,15 @@ always @(posedge CLK) begin
 	reg [8:0] cross_sz;
 	reg sensor_pend;
 	reg [7:0] sensor_time;
-	
-	TRIGGER <= BTN_MODE ? MOUSE[0] : (JOY_TRIG);
 
-	if (LIGHT && VDE && HDE) begin
-		first_light <= 1;
-		first_light_h <= 1;
-		if (!first_light_h)
-			first_light_col <= hcnt;
-		if (!first_light)
-			first_light_line <= vcnt - LINE_DELAY;
-	end
+	TRIGGER <= BTN_MODE ? MOUSE[0] : (JOY_TRIG);
 
 	case(SIZE)
 			0: cross_sz <= 8'd1;
 			1: cross_sz <= 8'd3;
 	default: cross_sz <= 8'd0;
 	endcase
-	
+
 	old_ms <= MOUSE[24];
 	if(MOUSE_XY) begin
 		if(old_ms ^ MOUSE[24]) begin
@@ -99,17 +86,15 @@ always @(posedge CLK) begin
 		if(~&hcnt) hcnt <= hcnt + 1'd1;
 		if(~old_hde & ~HDE) begin
 			hcnt <= 0;
-			first_light_h <= 0;
 		end
 		if(old_hde & ~hde_d[15]) begin
 			if(~VDE) begin
 				vcnt <= 0;
-				first_light <= 0;
 				if(vcnt) vtotal <= vcnt - 1'd1;
 			end else if(~&vcnt)
 				vcnt <= vcnt + 1'd1;
 		end
-		
+
 		old_vde <= VDE;
 		if(~old_vde & VDE) begin
 			x  <= lg_x;
@@ -120,7 +105,7 @@ always @(posedge CLK) begin
 			yp <= lg_y + cross_sz;
 			offscreen <= !lg_y[7:1] || lg_y >= (vtotal-3'd1);
 		end
-		
+
 		if(~&sensor_time) sensor_time <= sensor_time + 1'd1;
 		if(sensor_pend) begin
 			if (sensor_time >= (SENSOR_DELAY)) begin
@@ -133,12 +118,12 @@ always @(posedge CLK) begin
 		else if(sensor_time > 64) SENSOR <= 1'b0;
 	end
 
-	if(HDE && VDE && (x == hcnt + first_light_col) && (y <= vcnt+ first_light_line) && (y > (vcnt - 8) + first_light_line)) begin
+	if(HDE && VDE && (x == hcnt) && (y > (vcnt + LINE_DELAY) - 14) && (y <= (vcnt + LINE_DELAY) - 6)) begin
 		sensor_pend <= 1'b1;
 		sensor_time <= 8'd0;
 	end
-	
-	draw <= (((SIZE[1] || ($signed(hcnt) >= $signed(xm) && hcnt <= xp)) && y == vcnt) || 
+
+	draw <= (((SIZE[1] || ($signed(hcnt) >= $signed(xm) && hcnt <= xp)) && y == vcnt) ||
 				((SIZE[1] || ($signed(vcnt) >= $signed(ym) && vcnt <= yp)) && x == hcnt));
 end
 

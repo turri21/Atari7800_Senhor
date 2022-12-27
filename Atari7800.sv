@@ -263,6 +263,7 @@ parameter CONF_STR = {
 	"h1P2O6,Sega Phaser Mode,No,Yes;",
 	"P2oH,Swap Paddle A<->B,No,Yes;",
 	"P2oE,Quadtari,Off,On;",
+	"P2O[72:70],Gun X Tuning,0,1,2,3,4,5,6,7;",
 	"P2-;",
 	"P2o01,Gun Control,Joy1,Joy2,Mouse;",
 	"P2o2,Gun Fire,Joy,Mouse;",
@@ -410,7 +411,7 @@ wire [7:0] R,G,B;
 wire HSync;
 wire VSync;
 wire HBlank;
-wire VBlank;
+wire VBlank, VBlank_orig;
 
 wire [15:0] bios_addr;
 reg [7:0] cart_data, bios_data;
@@ -502,6 +503,7 @@ Atari7800 main
 	.VSync        (VSync),
 	.HBlank       (HBlank),
 	.VBlank       (VBlank),
+	.VBlank_orig  (VBlank_orig),
 	.ce_pix       (ce_pix_raw),
 	.show_border  (~status[14]),
 	.show_overscan(status[29]),
@@ -774,13 +776,13 @@ lightgun lightgun
 	.JOY_TRIG(~|gun_mode ? (joya[4] || joya[5]) :(joyb[4] || joyb[5])),
 
 	.HDE(~HBlank),
-	.VDE(~VBlank),
+	.VDE(~VBlank_orig),
 	.CE_PIX(ce_pix_raw),
 
 	.BTN_MODE(gun_btn_mode),
 	.SIZE(status[37:36]),
-	.SENSOR_DELAY(tia_en ? 21 : 46),
-	.LINE_DELAY(tia_en ? 8 : 8),
+	.SENSOR_DELAY((tia_en ? 8'd20 : 8'd48) + {status[72:70], 1'b0}),
+	.LINE_DELAY((tia_en ? 8'd1 : 8'd20)),
 
 	.TARGET(gun_target),
 	.SENSOR(gun_sensor),

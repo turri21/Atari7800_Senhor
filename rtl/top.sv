@@ -17,6 +17,7 @@ module Atari7800(
 	output logic        VSync,
 	output logic        HBlank,
 	output logic        VBlank,
+	output logic        VBlank_orig,
 	output logic        ce_pix,
 	input  logic        PAL,
 	input  logic [1:0]  pal_temp,
@@ -141,6 +142,7 @@ module Atari7800(
 	assign cart_DB_out = tia_en ? cart_2600_DB_out : cart_7800_DB_out;
 	assign PAread = cs_riot && ~|AB[4:0] && RW && pclk0;
 	assign cpu_ce = pclk1;
+	assign VBlank_orig = maria_en ? maria_vblank : tia_vblank;
 
 	// Track the open bus since FPGA's don't use bidirectional logic internally
 	always_ff @(posedge clk_sys) begin
