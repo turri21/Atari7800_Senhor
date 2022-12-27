@@ -41,6 +41,7 @@ module cart
 	output logic [15:0] ym_audio_l,
 	output logic [15:0] covox_r,
 	output logic [15:0] covox_l,
+	output logic        external_audio,
 	output logic [24:0] rom_address,
 	output logic [17:0] cartram_addr,
 	output logic        cartram_wr,
@@ -69,8 +70,12 @@ logic [24:0] souper_addr;
 wire souper_en = cart_flags[12];
 logic [11:0] souper_bank;
 logic [2:0] ram_bank;
+logic [8:0] bs_map;
+logic [1:0] bankset_count;
 logic souper_wr;
 logic pokey_irq_n, ym_irq_n;
+
+logic [31:0] cart_size_bs;
 
 wire XCTRL1_cs = (cart_xm[0] && address_in[15:4] == 8'h47) && cart_cs;
 always @(posedge clk_sys) begin
@@ -91,6 +96,11 @@ end
 
 
 wire is_9b = cart_flags[3];
+wire is_bankset = cart_flags[13];
+wire is_bankset_mem = cart_flags[14];
+wire bankset_banks = is_bankset & bankset_count[1];
+assign cart_size_bs = is_bankset ? (cart_size >> 1'd1) : cart_size;
+
 wire [7:0] highest_bank = (8'hFF & bank_mask) + is_9b;
 wire [7:0] second_highest_bank = is_9b ? 8'd0 : (8'hFE & bank_mask);
 wire [7:0] sg_bank = (bank_reg & bank_mask) + is_9b;
@@ -101,6 +111,13 @@ always_ff @(posedge clk_sys) if (pclk1) begin
 	address_offset <= 32'd0;
 	bank_mask <= 8'b11111111;
 	ram_mask <= '1;
+	bs_map <= 9'd0;
+	if (~halt_n) begin
+		if (is_bankset && ~bankset_count[1])
+			bankset_count <= bankset_count + 1'd1;
+	end else begin
+		bankset_count <= 2'd0;
+	end
 
 	// Banking mode selector
 	if (cart_flags[8]) begin                                   // Activision
@@ -118,25 +135,39 @@ always_ff @(posedge clk_sys) if (pclk1) begin
 	end else if (cart_flags[12]) begin                           // Souper
 		hardware_map <= '{3'd4, 3'd4, 3'd4, 3'd4, 3'd4, 3'd4, 3'd4, 3'd4};
 		bank_type <= 3'd4;
-	end else if (cart_flags[1] || cart_size >= 32'h10000) begin // SuperGame
+	end else if (cart_flags[13] || cart_flags[14] || cart_flags[1] || cart_size_bs >= 32'h10000) begin // SuperGame
 		hardware_map <= '{3'd0, 3'd0, 3'd4, 3'd4, 3'd4, 3'd4, 3'd4, 3'd4};
 		bank_map <= '{8'd0, 8'd0, second_highest_bank, second_highest_bank, 8'd0, 8'd0, highest_bank, highest_bank};
 		bank_map[4] <= sg_bank;
 		bank_map[5] <= sg_bank;
-		if (cart_size[22])
+		if (cart_size_bs[22]) begin
 			bank_mask <= 8'b11111111;
-		else if (cart_size[21])
+			bs_map <= 9'b1_0000_0000;
+		end else if (cart_size_bs[21]) begin
 			bank_mask <= 8'b01111111;
-		else if (cart_size[20])
+			bs_map <= 9'b0_1000_0000;
+		end else if (cart_size_bs[20]) begin
 			bank_mask <= 8'b00111111;
-		else if (cart_size[19])
+			bs_map <= 9'b0_0100_0000;
+		end else if (cart_size_bs[19]) begin
 			bank_mask <= 8'b00011111;
-		else if (cart_size[18])
+			bs_map <= 9'b0_0010_0000;
+		end else if (cart_size_bs[18]) begin
 			bank_mask <= 8'b00001111;
-		else if (cart_size[17])
+			bs_map <= 9'b0_0001_0000;
+		end else if (cart_size_bs[17]) begin
 			bank_mask <= 8'b00000111;
-		else
+			bs_map <= 9'b0_0000_1000;
+		end else if (cart_size_bs[16]) begin
 			bank_mask <= 8'b00000011;
+			bs_map <= 9'b0_0000_0100;
+		end else if (cart_size_bs[15]) begin
+			bank_mask <= 8'b00000001;
+			bs_map <= 9'b0_0000_0010;
+		end else begin
+			bank_mask <= 8'b00000000;
+			bs_map <= 9'b0_0000_0001;
+		end
 		bank_type <= 3'd0;
 	end else begin                                     // Not banked
 		if (cart_size <= 32'h2000) // A7808
@@ -152,7 +183,7 @@ always_ff @(posedge clk_sys) if (pclk1) begin
 	end
 
 	// Alternative hardware at $4k selector
-	if (cart_flags[2]) begin // Supergame RAM at $4k
+	if (cart_flags[2] || cart_flags[14]) begin // Supergame RAM at $4k
 		hardware_map[2] <= 3'd3;
 		hardware_map[3] <= 3'd3;
 	end else if (cart_flags[5]) begin // Supergame 8kb RAM at $6k
@@ -183,10 +214,13 @@ assign IRQ_n = pokey_irq_en ? pokey_irq_n : 1'b1;
 wire is_pokey_450 = (((cart_flags[6] || XCTRL1[4]) && address_in[15:4] == 12'h45) && cart_cs);
 wire is_pokey_440 = (((cart_flags[10] || XCTRL1[4]) && address_in[15:4] == 8'h44) && cart_cs);
 wire is_pokey_4k = ((cart_flags[0] && address_in[15:14] == 2'b01) && cart_cs);
-wire pokey4k_wo = cart_flags[0] && cart_flags[3];
+wire is_pokey_800 = ((cart_flags[15] && address_in[15:11] == 5'h1) && cart_cs);
+wire pokey4k_wo = cart_flags[0] && (cart_flags[3] || is_bankset);
 wire is_covox = address_in[15:4] == 12'h43;
 
 wire is_ym = (((cart_flags[11] || XCTRL1[7]) && address_in[15:1] == 15'h230) && cart_cs);
+
+assign external_audio = cart_flags[6] || cart_flags[10] || cart_flags[0] || is_covox || cart_flags[11] || cart_flags[15];
 
 logic [2:0] address_index;
 assign address_index = address_in[15:13];
@@ -198,7 +232,7 @@ always_comb begin
 	ram_cs = 0;
 	ym_cs = 0;
 	rom_address = 25'd0;
-	if (is_pokey_450)
+	if (is_pokey_450 || is_pokey_800)
 		pokey_cs = 1;
 	else if (is_pokey_440)
 		pokey2_cs = 1;
@@ -206,6 +240,8 @@ always_comb begin
 		pokey_cs = 1;
 	else if (is_ym)
 		ym_cs = 1;
+	else if (is_bankset_mem & ~rw & &address_in[15:14])
+		ram_cs = 1;
 	else if (cart_cs) case (hardware_map[address_index])
 		3'd1: begin           // ROM Data
 			rom_address = {1'b0, address_in - address_offset[15:0]};
@@ -215,7 +251,7 @@ always_comb begin
 		3'd4: begin           // Banked ROM
 			case (bank_type)
 				3'd0: // SuperGame
-					rom_address = {bank_map[address_index], address_in[13:0]};
+					rom_address = {bank_map[address_index], address_in[13:0]} | {(bankset_banks ? bs_map : 9'd0), 14'd0};
 				3'd1: // Activision
 					rom_address = {1'b0, bank_map[address_index], address_in[12:0]};
 				3'd2: // No banking
@@ -270,17 +306,8 @@ always_ff @(posedge clk_sys) begin
 	end
 end
 
-// spram #(.addr_width(17)) cart_ram
-// (
-// 	.clock   (clk_sys),
-// 	.address (souper_en ? souper_addr : ({ram_bank, address_in[13:0]} & ram_mask)),
-// 	.data    (din),
-// 	.wren    ((ram_cs || (~souper_ram_cs && souper_en)) && ~rw && pclk0),
-// 	.q       (ram_dout),
-// 	.cs      (1)
-// );
-
-assign cartram_addr = (souper_en ? souper_addr[17:0] : ({ram_bank, address_in[13:0]} & ram_mask));
+wire [14:0] bankset_ram_addr = {bankset_banks | (~rw & &address_in[15:14]), address_in[13:0]};
+assign cartram_addr = is_bankset_mem ? bankset_ram_addr : (souper_en ? souper_addr[17:0] : ({ram_bank, address_in[13:0]} & ram_mask));
 assign cartram_wr = ((ram_cs || (~souper_ram_cs && souper_en)) && ~rw && pclk0);
 assign cartram_rd = ~cartram_wr;
 assign cartram_wrdata = din;
@@ -307,7 +334,7 @@ always_comb begin
 		dout = hsc_rom_dout;
 	if (hsc_ram_cs)
 		dout = hsc_ram_dout;
-	if (is_pokey_450 || (is_pokey_4k && ~pokey4k_wo))
+	if (is_pokey_450 || is_pokey_800 || (is_pokey_4k && ~pokey4k_wo))
 		dout = pokey4k_dout;
 	if (is_pokey_440)
 		dout = pokey2_dout;
@@ -335,7 +362,7 @@ always @(posedge clk_sys) begin
 	pokey2_mux <= ch0_2 + ch1_2 + ch2_2 + ch3_2;
 end
 
-assign pokey_audio_r = (cart_flags[0] || cart_flags[6] || cart_flags[10]) ? {pokey_mux, 10'd0} : 16'd0;
+assign pokey_audio_r = (cart_flags[0] || cart_flags[6] || cart_flags[10] || cart_flags[15]) ? {pokey_mux, 10'd0} : 16'd0;
 assign pokey_audio_l = ~using_two_pokey ? pokey_audio_r : {pokey2_mux, 10'd0};
 
 logic [5:0] keyboard_scan;

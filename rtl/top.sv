@@ -45,7 +45,7 @@ module Atari7800(
 	output logic  [7:0] cart_din,
 	output logic        RW,
 	input  logic        loading,
-	
+
 	output       [17:0] cartram_addr,
 	output              cartram_wr,
 	output              cartram_rd,
@@ -118,7 +118,7 @@ module Atari7800(
 	logic           mclk1;
 	logic           cs_ram0, cs_ram1, cs_tia, cs_riot, cs_maria;
 	logic [7:0]     open_bus;
-	wire            cart_read_flag;
+	wire            cart_read_flag, ext_audio;
 	logic [24:0]    cart_2600_addr_out, cart_7800_addr_out;
 	logic [7:0]     cart_2600_DB_out, cart_7800_DB_out;
 	logic           cpu_rwn;
@@ -167,7 +167,7 @@ module Atari7800(
 			2'b11 : AB = cpu_AB & maria_AB_out;
 		endcase
 		RW = cpu_released ? 1'b1 : cpu_rwn;
-		
+
 		if (cpu_driver && tia_en) begin
 			pclk0 = pclk0_t;
 			pclk1 = pclk1_t;
@@ -351,8 +351,17 @@ module Atari7800(
 	wire [15:0] tia_r = (use_stereo ? audio_lut_single[audv0] : audio_lut[aud_index]);
 	wire [15:0] tia_l = (use_stereo ? audio_lut_single[audv1] : audio_lut[aud_index]);
 
-	assign AUDIO_R = tia_r + pokey_audio_r + ym_audio_r + covox_r + {tape_audio, 12'd0};
-	assign AUDIO_L = tia_l + pokey_audio_l + ym_audio_l + covox_l + {tape_audio, 12'd0};
+	// There is an assumption made here that all audio sources will not be used simultaneously at
+	// max volume. If this is the case, there will be clipping. Tia audio cannot be greater than
+	// 0x7FFF on a single channel. When external audio sources are used, the overall volume will be
+	// halved to ensure no clipping. If in the future more than two external audio devices are used
+	// at once, eg covox + ym2151 + tia, then more reduction will be needed, but for the time being
+	// that seems unlikely.
+	wire [16:0] audio_mix_r = tia_r + pokey_audio_r + ym_audio_r + covox_r + {tape_audio, 12'd0};
+	wire [16:0] audio_mix_l = tia_l + pokey_audio_l + ym_audio_l + covox_l + {tape_audio, 12'd0};
+
+	assign AUDIO_R = ext_audio ? audio_mix_r[16:1] : audio_mix_r[15:0];
+	assign AUDIO_L = ext_audio ? audio_mix_r[16:1] : audio_mix_l[15:0];
 
 	logic [7:0] ar_ram_addr;
 	M6532 #(.init_7800(1)) riot_inst
@@ -465,6 +474,7 @@ module Atari7800(
 		.open_bus       (open_bus),
 		.covox_r        (covox_r),
 		.covox_l        (covox_l),
+		.external_audio (ext_audio),
 		.ps2_key        (ps2_key),
 		.pokey_irq_en   (pokey_irq)
 	);
@@ -564,7 +574,7 @@ module M6502C
 
 	logic cpu_halt_n = 1;
 	logic rdy_delay = 1;
-	
+
 	T65 cpu (
 		.mode (0),
 		.BCD_en(1),
