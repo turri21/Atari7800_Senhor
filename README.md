@@ -10,7 +10,7 @@
 - YM2151 Audio using Jotego's JT51.
 - Supports Covox.
 - Support for XM and XBoard modules.
-- Supports Activision, Absolute, Souper, and Supergame mappers up to 1mb.
+- Supports Activision, Absolute, Bankset, Souper, and Supergame mappers up to 1mb.
 - Choice of Cool, Warm, or Hot system temperature color output.
 
 ## Setup
