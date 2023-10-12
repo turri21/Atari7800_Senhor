@@ -1,8 +1,0 @@
-TREBORS_ATARI_PRO_PALETTES_V2-MiSTer:
-
-\\(1) Region\(2) Console Brightness Output Simulation\(3) Display Hue Output Simulation\(4) Palette Temperature
-
-(1) NTSC | PAL
-(2) AV (Modern A/V Mod Output) | BAL (Balance between AV and RF) | RF (RF Output)
-(3) CRT | CRTALT | LCD | LCDALT
-(4) COOL (25.7) | COOLPLUS (26.2) | WARM (26.7) | WARMPLUS (27.2) | HOT (27.7)
