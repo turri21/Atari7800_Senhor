@@ -25,7 +25,10 @@ else if (hasMatchE0 && cart_size=='d8192) force_bs<=BANKE0;
 else if (hasMatch3E && cart_size>'d4096)  force_bs<=BANK3E;
 else if (hasMatch3F && cart_size>'d4096) force_bs<=BANK3F;
 else if (hasMatchSB && cart_size>='d131072) force_bs<=BANKSB;
-else if (hasMatchEF && cart_size=='d65536 ) force_bs<=BANKEF;
+else if (hasMatchEF && cart_size=='d65536 ) begin
+	force_bs<=BANKEF;
+	sc <= has_sc;
+end
 else if (hasMatchDPCP && cart_size=='d32768) force_bs<=BANKDPCP;
 else if (hasMatchCTY && cart_size=='d32768) force_bs<=BANKCTY;
 else if (hasMatchCTY && cart_size=='d61440) force_bs<=BANKCTY; // F4 banking works for the one game that uses this
