@@ -1,3 +1,8 @@
+-=(PSX_Senhor notes)=-
+
+Tested: Working Video 720p, 1080p & Sound
+
+___
 # Atari7800 for MiSTer.
 
 ## Features
