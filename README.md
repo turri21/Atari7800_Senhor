@@ -1,4 +1,4 @@
--=(PSX_Senhor notes)=-
+-=(Atari7800_Senhor notes)=-
 
 Tested: Working Video 720p, 1080p & Sound
 
